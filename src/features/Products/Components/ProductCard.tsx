@@ -9,7 +9,7 @@ type ProductCardProps = {
   title: string;
   category: string;
   price: number;
-  id?: number; // opcional si lo pasás
+  id: number;
 };
 
 export const ProductCard = ({ image, title, category, price, id }: ProductCardProps) => {
@@ -23,7 +23,14 @@ export const ProductCard = ({ image, title, category, price, id }: ProductCardPr
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-      <img src={image} alt={title} className="w-full h-48 object-cover" />
+      <img
+        src={image}
+        alt={title}
+        className="w-full h-48 object-cover"
+        onError={(event) => {
+          event.currentTarget.src = "https://via.placeholder.com/400x300?text=No+Image";
+        }}
+      />
       <div className="p-4 space-y-2">
         <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
         <p className="text-sm text-gray-500">{category}</p>
