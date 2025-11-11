@@ -6,7 +6,7 @@ export const useProducts = () =>
   useQuery<Product[]>({
     queryKey: ["products"],
     queryFn: async () => {
-      const { data } = await api.get("/products");
+      const { data } = await api.get("/products/");
       return data;
     },
     staleTime:1000*60*5
