@@ -1,6 +1,12 @@
 import React from "react";
 
-export type SortOption = "default" | "price-asc" | "price-desc" | "name";
+export type SortOption =
+  | "default"
+  | "price-asc"
+  | "price-desc"
+  | "name"
+  | "rating-desc";
+
 
 interface SortFilterProps {
   sort: SortOption;
@@ -23,6 +29,7 @@ export const SortFilter: React.FC<SortFilterProps> = ({ sort, setSort }) => {
         <option value="price-asc">Price: Low → High</option>
         <option value="price-desc">Price: High → Low</option>
         <option value="name">Name (A-Z)</option>
+        <option value="rating-desc">Rating (High → Low)</option>
       </select>
     </div>
   );

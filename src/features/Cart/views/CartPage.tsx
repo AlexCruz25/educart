@@ -1,48 +1,120 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { AxiosError } from "axios";
 import type { CartItem } from "../types/cartItem";
 import { CartItemCard } from "../components/CartItem";
 import { OrderSummary } from "../components/OrderSummary";
-
-
-// Simulación temporal de productos en carrito
-const mockCart: CartItem[] = [
-  {
-    id: 1,
-    title: "Advanced Mathematics Textbook",
-    price: 49.99,
-    quantity: 2,
-    image: "/src/assets/1.webp",
-  },
-];
+import {
+  useCartSummary,
+  useCheckoutCart,
+  useRemoveCartItem,
+  useUpdateCartItem,
+} from "../hooks/useCart";
+import { useAppSelector } from "../../../store/hook";
 
 export default function CartPage() {
-  const [cart, setCart] = useState<CartItem[]>(mockCart);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
-  const subtotal = useMemo(
-    () => cart.reduce((acc, item) => acc + item.price * item.quantity, 0),
-    [cart]
-  );
-  const shipping = subtotal > 100 ? 0 : 9.99;
-  const tax = subtotal * 0.08;
-  const total = subtotal + shipping + tax;
+const { data: summary, isFetching } = useCartSummary({ enabled: isAuthenticated });
+  const updateItem = useUpdateCartItem();
+  const removeItem = useRemoveCartItem();
+  const checkout = useCheckoutCart();
 
-  const handleQuantityChange = (id: number, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) =>
-          item.id === id
-            ? { ...item, quantity: Math.max(item.quantity + delta, 0) }
-            : item
-        )
-        .filter((i) => i.quantity > 0)
+const handleQuantityChange = async (productId: number, delta: number) => {
+    if (!summary) return;
+    const current = summary.items.find((item) => item.product_id === productId);
+    if (!current) return;
+
+  const nextQuantity = current.quantity + delta;
+
+  try {
+      if (nextQuantity <= 0) {
+        await removeItem.mutateAsync(productId);
+        setFeedback("Producto eliminado del carrito");
+      } else {
+        await updateItem.mutateAsync({ productId, quantity: nextQuantity });
+        setFeedback("Cantidad actualizada");
+      }
+    } catch (error) {
+      const detail =
+        error instanceof AxiosError
+          ? (error.response?.data as { detail?: string })?.detail
+          : null;
+      setFeedback(detail ?? "No se pudo actualizar el carrito");
+    }
+  };
+
+  const handleRemove = async (productId: number) => {
+    try {
+      await removeItem.mutateAsync(productId);
+      setFeedback("Producto eliminado del carrito");
+    } catch (error) {
+      const detail =
+        error instanceof AxiosError
+          ? (error.response?.data as { detail?: string })?.detail
+          : null;
+      setFeedback(detail ?? "No se pudo eliminar el producto");
+    }
+  };
+
+  const handleCheckout = async () => {
+    if (!summary || summary.items.length === 0) {
+      setFeedback("Tu carrito está vacío");
+      return;
+    }
+    try {
+      const response = await checkout.mutateAsync();
+      setFeedback(response.detail);
+    } catch (error) {
+      if (error instanceof AxiosError && error.response?.status === 401) {
+        navigate("/login", { state: { from: location } });
+        return;
+      }
+      const detail =
+        error instanceof AxiosError
+          ? (error.response?.data as { detail?: string })?.detail
+          : null;
+      setFeedback(detail ?? "No se pudo procesar el checkout");
+    }
+  };
+
+  const subtotal = useMemo(() => summary?.subtotal ?? 0, [summary]);
+  const taxes = useMemo(() => summary?.taxes ?? 0, [summary]);
+  const total = useMemo(() => summary?.total ?? 0, [summary]);
+
+  if (!isAuthenticated) {
+    return (
+      <main className="flex-grow container mx-auto px-4 py-8">
+        <div className="bg-white shadow rounded-lg p-8 text-center">
+          <h1 className="text-2xl font-bold text-indigo-700 mb-4">
+            Your cart is waiting
+          </h1>
+          <p className="text-gray-600 mb-6">
+            Necesitas iniciar sesión para ver y administrar tu carrito.
+          </p>
+          <div className="flex flex-col md:flex-row gap-4 justify-center">
+            <button
+              onClick={() => navigate("/login", { state: { from: location } })}
+              className="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700"
+            >
+              Iniciar sesión
+            </button>
+            <button
+              onClick={() => navigate("/register")}
+              className="border border-indigo-600 text-indigo-600 px-6 py-3 rounded-md hover:bg-indigo-50"
+            >
+              Crear cuenta
+            </button>
+          </div>
+        </div>
+      </main>
     );
-    // TODO: PATCH /cart/{id} {quantity: newValue}
-  };
+  }
 
-  const handleRemove = (id: number) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
-    // TODO: DELETE /cart/{id}
-  };
+  const hasItems = (summary?.items.length ?? 0) > 0;
 
   return (
     <main className="flex-grow container mx-auto px-4 py-8">
@@ -62,13 +134,16 @@ export default function CartPage() {
               <div className="col-span-2 text-right">Total</div>
             </div>
 
-            {cart.length > 0 ? (
-              cart.map((item) => (
+            {hasItems ? (
+              summary?.items.map((item: CartItem) => (
                 <CartItemCard
-                  key={item.id}
+                  key={item.product_id}
                   item={item}
                   onQuantityChange={handleQuantityChange}
                   onRemove={handleRemove}
+                  disabled={
+                    isFetching || updateItem.isPending || removeItem.isPending
+                  }
                 />
               ))
             ) : (
@@ -95,9 +170,12 @@ export default function CartPage() {
         <div className="lg:w-1/3">
           <OrderSummary
             subtotal={subtotal}
-            shipping={shipping}
-            tax={tax}
+            taxes={taxes}
             total={total}
+            onCheckout={handleCheckout}
+            isProcessing={checkout.isPending}
+            disabled={!hasItems}
+            helperText={feedback}
           />
         </div>
       </div>

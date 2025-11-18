@@ -1,20 +1,55 @@
-import { useState, useMemo } from "react";
-// import img1 from "../../../assets/1.webp";
-// import img2 from "../../../assets/2.webp";
-// import img3 from "../../../assets/3.webp";
+import { useMemo, useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { AxiosError } from "axios";
 
 import { ProductCard } from "../Components/ProductCard";
 import { SortFilter, type SortOption } from "../Components/SortFilter";
-import { SideFilter, type CategoryOption } from "../Components/SideFilter";
-// import type { Product } from "../types/product";
+import { SideFilter } from "../Components/SideFilter";
 import { useProducts } from "../hooks/useProducts";
+import { useAddToCart } from "../../Cart/hooks/useCart";
+import { useAppSelector } from "../../../store/hook";
 
 export default function ProductsPage() {
   const [sort, setSort] = useState<SortOption>("default");
-  const [selectedCategory, setSelectedCategory] = useState<CategoryOption>("All");
-  const [priceRange, setPriceRange] = useState<number>(200);
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [priceRange, setPriceRange] = useState<number>(0);
+  const [minRating, setMinRating] = useState<number>(0);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [addingId, setAddingId] = useState<number | null>(null);
 
-  const {data:products=[], isLoading, isError, error}=useProducts();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+
+  const { data: products = [], isLoading, isError, error } = useProducts();
+  const addToCart = useAddToCart();
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach((product) => {
+      if (product.category) {
+        set.add(product.category);
+      }
+    });
+    return ["All", ...Array.from(set)];
+  }, [products]);
+
+  const maxPrice = useMemo(() => {
+    if (!products.length) return 100;
+    return Math.ceil(Math.max(...products.map((p) => p.price)));
+  }, [products]);
+
+  useEffect(() => {
+    if (maxPrice > 0) {
+      setPriceRange((current) => {
+        if (current === 0 || current > maxPrice) {
+          return maxPrice;
+        }
+        return current;
+      });
+    }
+  }, [maxPrice]);
+
 
  
 
@@ -27,6 +62,7 @@ export default function ProductsPage() {
     }
 
     result = result.filter((p) => p.price <= priceRange);
+    result = result.filter((p) => (p.rating ?? 0) >= minRating);
 
     switch (sort) {
       case "price-asc":
@@ -38,12 +74,41 @@ export default function ProductsPage() {
       case "name":
         result.sort((a, b) => a.title.localeCompare(b.title));
         break;
+      case "rating-desc":
+        result.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+        break;
       default:
         break;
     }
 
     return result;
-  }, [products, selectedCategory, priceRange, sort]);
+  }, [products, selectedCategory, priceRange, minRating, sort]);
+
+  const handleAddToCart = async (productId: number) => {
+    if (!isAuthenticated) {
+      navigate("/login", { state: { from: location } });
+      return;
+    }
+
+    try {
+      setAddingId(productId);
+      setFeedback(null);
+      await addToCart.mutateAsync({ productId, quantity: 1 });
+      setFeedback("Producto agregado al carrito");
+    } catch (err) {
+      if (err instanceof AxiosError && err.response?.status === 401) {
+        navigate("/login", { state: { from: location } });
+        return;
+      }
+      const detail =
+        err instanceof AxiosError
+          ? (err.response?.data as { detail?: string })?.detail
+          : null;
+      setFeedback(detail ?? "No se pudo agregar el producto");
+    } finally {
+      setAddingId(null);
+    }
+  };
 
   if (isLoading)
     return (
@@ -70,16 +135,27 @@ export default function ProductsPage() {
           {/* Filtros laterales */}
           <div className="lg:w-1/4">
             <SideFilter
+              categories={categories}
               selectedCategory={selectedCategory}
               setSelectedCategory={setSelectedCategory}
               priceRange={priceRange}
               setPriceRange={setPriceRange}
+              maxPrice={maxPrice}
+              minRating={minRating}
+              setMinRating={setMinRating}
             />
           </div>
 
           {/* Listado principal */}
           <div className="lg:w-3/4">
             <SortFilter sort={sort} setSort={setSort} />
+
+            {feedback && (
+              <p className="mb-4 text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 p-3 rounded">
+                {feedback}
+              </p>
+            )}
+
 
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filtered.map((product) => (
@@ -90,6 +166,10 @@ export default function ProductsPage() {
                   title={product.title}
                   category={product.category}
                   price={product.price}
+                  rating={product.rating}
+                  description={product.description}
+                  onAddToCart={handleAddToCart}
+                  isAdding={addingId === product.id}
                 />
               ))}
 

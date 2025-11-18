@@ -20,6 +20,8 @@ const mapProduct = (product: ApiProduct): Product => ({
   category: product.category ?? "General",
   price: product.price,
   image: product.image_url || FALLBACK_IMAGE,
+  description: product.description,
+  rating: product.rating,
 });
 
 

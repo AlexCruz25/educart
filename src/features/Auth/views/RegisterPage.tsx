@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { AxiosError } from "axios";
 
 import { loginSuccess } from "../redux/authSlice";
 
-import { useNavigate } from "react-router-dom";
 import { useAppDispatch } from "../../../store/hook";
 import { api } from "../../../lib/axiosInstance";
 
@@ -10,6 +11,7 @@ export default function RegisterPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
+  const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,15 +23,19 @@ export default function RegisterPage() {
     setError("");
 
     try {
-      await api.post("/auth/register", { username, password });
+      await api.post("/auth/register", { username, email, password });
 
       // Ahora hacemos login automático tras el registro
       const { data } = await api.post("/auth/login", { username, password });
       dispatch(loginSuccess({ token: data.access_token, username }));
 
       navigate("/"); // Redirigir al home
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "No se pudo registrar");
+    } catch (err) {
+      const detail =
+        err instanceof AxiosError
+          ? (err.response?.data as { detail?: string })?.detail
+          : null;
+      setError(detail ?? "No se pudo registrar");
     } finally {
       setLoading(false);
     }
@@ -47,7 +53,8 @@ export default function RegisterPage() {
 
         {error && (
           <p className="text-red-500 text-sm mb-3 text-center">{error}</p>
-        )}
+        )}    
+        <label className="block text-sm font-medium text-gray-700">Nombre de usuario</label>
 
         <input
           type="text"
@@ -56,6 +63,17 @@ export default function RegisterPage() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
         />
+
+        <label className="block text-sm font-medium text-gray-700">Correo electrónico</label>
+        <input
+          type="email"
+          className="w-full border rounded p-2 mb-3"
+          placeholder="correo@ejemplo.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <label className="block text-sm font-medium text-gray-700">Contraseña</label>
 
         <input
           type="password"
