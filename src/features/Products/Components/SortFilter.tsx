@@ -4,7 +4,8 @@ export type SortOption =
   | "default"
   | "price-asc"
   | "price-desc"
-  | "name"
+  | "name-asc"
+  | "name-desc"
   | "rating-desc";
 
 
@@ -28,7 +29,8 @@ export const SortFilter: React.FC<SortFilterProps> = ({ sort, setSort }) => {
         <option value="default">Default</option>
         <option value="price-asc">Price: Low → High</option>
         <option value="price-desc">Price: High → Low</option>
-        <option value="name">Name (A-Z)</option>
+        <option value="name-asc">Name (A-Z)</option>
+        <option value="name-desc">Name (Z-A)</option>
         <option value="rating-desc">Rating (High → Low)</option>
       </select>
     </div>

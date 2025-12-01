@@ -13,6 +13,9 @@ const initialState: AuthState = {
   isAuthenticated: !!localStorage.getItem("token"),
 };
 
+if (initialState.token) {
+  api.defaults.headers.common.Authorization = `Bearer ${initialState.token}`;
+}
 const authSlice = createSlice({
   name: "auth",
   initialState,

@@ -67,7 +67,8 @@ const handleQuantityChange = async (productId: number, delta: number) => {
     }
     try {
       const response = await checkout.mutateAsync();
-      setFeedback(response.detail);
+      const orderId = response.order?.id;
+      setFeedback(orderId ? `${response.detail} (Orden #${orderId})` : response.detail);
     } catch (error) {
       if (error instanceof AxiosError && error.response?.status === 401) {
         navigate("/login", { state: { from: location } });

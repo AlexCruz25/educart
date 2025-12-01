@@ -6,4 +6,8 @@ export interface Product {
   image: string;
   description?: string;
   rating?: number;
+  sku: string;
+  stockActual: number;
+  stockMinimo: number;
+  stockStatus: "normal" | "low_stock" | "out_of_stock";
 }

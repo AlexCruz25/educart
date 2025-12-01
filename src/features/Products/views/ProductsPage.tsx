@@ -1,19 +1,22 @@
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
 
 import { ProductCard } from "../Components/ProductCard";
 import { SortFilter, type SortOption } from "../Components/SortFilter";
 import { SideFilter } from "../Components/SideFilter";
-import { useProducts } from "../hooks/useProducts";
+import { useProducts, type ProductFilters } from "../hooks/useProducts";
 import { useAddToCart } from "../../Cart/hooks/useCart";
 import { useAppSelector } from "../../../store/hook";
+import SearchBar from "../Components/SearchBar";
 
 export default function ProductsPage() {
   const [sort, setSort] = useState<SortOption>("default");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [priceRange, setPriceRange] = useState<number>(0);
   const [minRating, setMinRating] = useState<number>(0);
+  const [search, setSearch] = useState<string>("");
+  const [availableCategories, setAvailableCategories] = useState<string[]>(["All"]);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<number | null>(null);
 
@@ -21,18 +24,38 @@ export default function ProductsPage() {
   const location = useLocation();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
 
-  const { data: products = [], isLoading, isError, error } = useProducts();
+  type SortBy = ProductFilters["sortBy"];
+  const sortMapping: Record<SortOption, SortBy | undefined> = {
+    default: undefined,
+    "price-asc": "price_asc",
+    "price-desc": "price_desc",
+    "name-asc": "name_asc",
+    "name-desc": "name_desc",
+    "rating-desc": "rating_desc",
+  };
+
+  const categoryFilter = selectedCategory !== "All" ? selectedCategory : undefined;
+
+  const { data: products = [], isLoading, isError, error } = useProducts({
+    category: categoryFilter,
+    maxPrice: priceRange || undefined,
+    minRating: minRating || undefined,
+    search: search.trim() || undefined,
+    sortBy: sortMapping[sort],
+  });
   const addToCart = useAddToCart();
 
-  const categories = useMemo(() => {
+  useEffect(() => {
+    if (!products.length) return;
+    if (categoryFilter) return;
     const set = new Set<string>();
     products.forEach((product) => {
       if (product.category) {
         set.add(product.category);
       }
     });
-    return ["All", ...Array.from(set)];
-  }, [products]);
+    setAvailableCategories(["All", ...Array.from(set)]);
+  }, [products, categoryFilter]);
 
   const maxPrice = useMemo(() => {
     if (!products.length) return 100;
@@ -53,36 +76,7 @@ export default function ProductsPage() {
 
  
 
-  // Filtrado y orden local (luego se reemplazará por API)
-  const filtered = useMemo(() => {
-    let result = [...products];
 
-    if (selectedCategory !== "All") {
-      result = result.filter((p) => p.category === selectedCategory);
-    }
-
-    result = result.filter((p) => p.price <= priceRange);
-    result = result.filter((p) => (p.rating ?? 0) >= minRating);
-
-    switch (sort) {
-      case "price-asc":
-        result.sort((a, b) => a.price - b.price);
-        break;
-      case "price-desc":
-        result.sort((a, b) => b.price - a.price);
-        break;
-      case "name":
-        result.sort((a, b) => a.title.localeCompare(b.title));
-        break;
-      case "rating-desc":
-        result.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-        break;
-      default:
-        break;
-    }
-
-    return result;
-  }, [products, selectedCategory, priceRange, minRating, sort]);
 
   const handleAddToCart = async (productId: number) => {
     if (!isAuthenticated) {
@@ -135,7 +129,7 @@ export default function ProductsPage() {
           {/* Filtros laterales */}
           <div className="lg:w-1/4">
             <SideFilter
-              categories={categories}
+              categories={availableCategories}
               selectedCategory={selectedCategory}
               setSelectedCategory={setSelectedCategory}
               priceRange={priceRange}
@@ -150,6 +144,8 @@ export default function ProductsPage() {
           <div className="lg:w-3/4">
             <SortFilter sort={sort} setSort={setSort} />
 
+            <SearchBar query={search} setQuery={setSearch} />
+
             {feedback && (
               <p className="mb-4 text-sm text-indigo-700 bg-indigo-50 border border-indigo-100 p-3 rounded">
                 {feedback}
@@ -158,7 +154,7 @@ export default function ProductsPage() {
 
 
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filtered.map((product) => (
+              {products.map((product) => (
                 <ProductCard
                   key={product.id}
                   id={product.id}
@@ -170,10 +166,12 @@ export default function ProductsPage() {
                   description={product.description}
                   onAddToCart={handleAddToCart}
                   isAdding={addingId === product.id}
+                  stockStatus={product.stockStatus}
+                  stockActual={product.stockActual}
                 />
               ))}
 
-              {filtered.length === 0 && (
+              {products.length === 0 && (
                 <p className="text-gray-500 text-center col-span-full">
                   No products found for this filter.
                 </p>

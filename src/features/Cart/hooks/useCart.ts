@@ -91,9 +91,11 @@ export const useCheckoutCart = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const { data } = await api.post<{ detail: string; summary: CartSummary }>(
-        "/cart/checkout"
-      );
+      const { data } = await api.post<{
+        detail: string;
+        summary: CartSummary;
+        order: { id: number; status: string };
+      }>("/orders");
       return data;
     },
     onSuccess: ({ summary }) => {
