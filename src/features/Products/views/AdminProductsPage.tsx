@@ -13,6 +13,9 @@ interface ProductForm {
   description?: string;
   image_url?: string;
   rating?: number;
+  sku: string;
+  stock_actual: number;
+  stock_minimo: number;
 }
 
 const EMPTY_FORM: ProductForm = {
@@ -22,6 +25,9 @@ const EMPTY_FORM: ProductForm = {
   description: "",
   image_url: "",
   rating: 0,
+  sku: "",
+  stock_actual: 0,
+  stock_minimo: 0,
 };
 
 export default function AdminProductsPage() {
@@ -35,10 +41,17 @@ export default function AdminProductsPage() {
 
   const isAdminUser = username === "admin";
 
+  const numericFields: (keyof ProductForm)[] = [
+    "price",
+    "rating",
+    "stock_actual",
+    "stock_minimo",
+  ];
+
   const handleInputChange = (field: keyof ProductForm, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: field === "price" || field === "rating" ? Number(value) : value,
+      [field]: numericFields.includes(field) ? Number(value) : value,
     }));
   };
 
@@ -51,6 +64,9 @@ export default function AdminProductsPage() {
       description: product.description,
       image_url: product.image,
       rating: product.rating,
+      sku: product.sku,
+      stock_actual: product.stockActual,
+      stock_minimo: product.stockMinimo,
     });
   };
 
@@ -174,6 +190,15 @@ export default function AdminProductsPage() {
             </datalist>
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700">SKU</label>
+            <input
+              className="w-full border rounded p-2"
+              value={formData.sku}
+              onChange={(e) => handleInputChange("sku", e.target.value)}
+              required
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700">Rating</label>
             <input
               type="number"
@@ -183,6 +208,26 @@ export default function AdminProductsPage() {
               className="w-full border rounded p-2"
               value={formData.rating ?? 0}
               onChange={(e) => handleInputChange("rating", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Stock actual</label>
+            <input
+              type="number"
+              min={0}
+              className="w-full border rounded p-2"
+              value={formData.stock_actual}
+              onChange={(e) => handleInputChange("stock_actual", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Stock mínimo</label>
+            <input
+              type="number"
+              min={0}
+              className="w-full border rounded p-2"
+              value={formData.stock_minimo}
+              onChange={(e) => handleInputChange("stock_minimo", e.target.value)}
             />
           </div>
           <div className="md:col-span-2">
